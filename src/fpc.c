@@ -43,12 +43,20 @@ readFingerprintSet(char *filename, FingerprintSet *fpp)
     size_t size = (size_t) 0;
     int length;
 
+    // If the file was readable...
     if ((FILE *) NULL != fp) {
+        // Try to read in an integer. If succesful...
         if (ONE == fread((void *) &length, sizeof(int), ONE, fp)) {
+
+            // Set the fingerprint length with the int you read in
             fpp->length = length;
+
+            // Get size of file and set the size of the fingerprints in fpp
             fseek(fp, 0, SEEK_END);
             size = ftell(fp);
             fpp->fingerprints = (int) (size / sizeof(int)) - 1;
+
+            // Check that the input file has fingerprints of the right size.
             if (0 == (fpp->fingerprints % fpp->length)) {
                 fpp->fingerprints /= fpp->length;
                 fpp->valuep = (int *)
