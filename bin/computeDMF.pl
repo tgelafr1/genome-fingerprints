@@ -49,7 +49,7 @@ my $rawFileExt = 'out';
 my $closeFileExt = 'out.close';
 my $normFileExt = 'outn';
 
-my($prevChrom, $prevStart, $prevKey, %count, %close, %binary, $snvPairs);
+my($prevChrom,$prevprevChrom, $prevStart, $prevprevStart, $prevKey,$prevprevKey, %count, %close, %binary, $snvPairs);
 my $cat = 'cat';
 if ($file =~ /\.gz$/) {
 	$cat = 'gunzip -c';
@@ -90,16 +90,20 @@ while (<INF>) {
 	
 	# Compute the key for the current SNV.
 	my $key = uc "$ref$var";
-	if ($chrom eq $prevChrom) {
+	if ($chrom eq $prevChrom && $chrom eq $prevprevChrom) {
 		# Compute the distance. The -1 is to shift to base zero for the modulo function.
-		my $d = $start-$prevStart-1;
-		next if $d<0;
+		my $d = $start-$prevprevStart-1;
+		my $D1 = $prevStart - $start - 1
+		my $D2 = $start - $prevStart -1
+		
+		next if $D1<0;
+		next if $D2<0;
 		
 		# Compute the key for the pair.
-		my $pairKey = $prevKey.$key;
+		my $pairKey = $prevprevKey.$prevKey.$key;
 		
 		# Add to table, segregating by $C, by pair key and by reduced distance.
-		if ($d<$C) {
+		if ($D1<$C || $D2 < $C ) {
 			$close{$pairKey}[$d]++;
 		} else {
 			$binary{$pairKey}[$d % 2]++;
@@ -109,9 +113,15 @@ while (<INF>) {
 	}
 	
 	# Store info on current SNV for next round.
+	$prevprevChrom = $prevChrom;
 	$prevChrom = $chrom;
+	
+	$prevprevStart = $prevStart;
 	$prevStart = $start;
+	
+	$prevprevKey = $prevKey;
 	$prevKey = $key;
+	
 }
 close INF;
 
