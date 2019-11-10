@@ -94,9 +94,9 @@ while (<INF>) {
 	my($D1, $D2, $d) = (0, 0, 0);
 	if ($chrom eq $prevChrom && $chrom eq $prevprevChrom) {
 		# Compute the distance. The -1 is to shift to base zero for the modulo function.
-		$d = $start-$prevprevStart-1;
-		$D1 = $prevStart - $start - 1;
-		$D2 = $start - $prevStart -1;
+		$d = $start - $prevprevStart - 1;
+		$D1 = $start - $prevStart - 1;
+		$D2 = $prevStart - $prevprevStart - 1;
 		
 		next if $D1<0;
 		next if $D2<0;
