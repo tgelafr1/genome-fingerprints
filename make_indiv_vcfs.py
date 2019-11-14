@@ -4,12 +4,12 @@ import subprocess
 
 header = pd.read_csv(sys.argv[1])
 names = header.Sample
+
 vcf = sys.argv[2]
 compute = sys.argv[3]
 
 for i, sample in enumerate(names):
-    print(sample)
     vcf_file = sample + ".vcf"
-    subprocess.call(["zcat", vcf, "|", "cut", "-f", "1-9", str(i+10), ">", vcf_file])
-    subprocess.call(["perl", compute, sample, vcf_file, "sum"])
-    subprocess.call(["rm", vcf_file])
+    subprocess.run("zcat " + vcf + " | cut -f 1-9," + str(i+10) + " > " + vcf_file, shell = True)
+    subprocess.call("perl " + compute + " "  +  sample + " " + vcf_file + " sum", shell = True)
+    subprocess.call("rm " + vcf_file, shell = True)
