@@ -9,6 +9,7 @@ vcf = sys.argv[2]
 compute = sys.argv[3]
 
 for i, sample in enumerate(names):
+    print(sample)
     vcf_file = sample + ".vcf"
     subprocess.run("zcat " + vcf + " | cut -f 1-9," + str(i+10) + " > " + vcf_file, shell = True)
     subprocess.call("perl " + compute + " "  +  sample + " " + vcf_file + " sum", shell = True)
