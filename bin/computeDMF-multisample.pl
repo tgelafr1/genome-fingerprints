@@ -1,12 +1,20 @@
 #!/usr/bin/env perl
 $|=1;
 use strict;
+use List::Util qw(min);
+use List::Util qw(max);
+use List::Util qw(any);
+use List::Util qw(sum);
+use List::MoreUtils qw(uniq);
+my $version = '181217';
 
-my($dir, $vls, $out) = @ARGV;
+my($dir, $k, $dist, $vls, $out) = @ARGV;
 
 # First parameter: the directory where the vcfs/bcfs are located. [cwd]
-# Second parameter (optional): the comma-delimited list of fingerprint lengths to compute. [120]
-# Third parameter (optional): the directory where output should be saved. [DFM_multisample_outdir]
+# The second (optional) parameter is the number of consecutive SNPs to use (integer)
+# The third (optional) parameter is the distance metric to use between SNPs.
+# Fourth parameter (optional): the comma-delimited list of fingerprint lengths to compute. [120]
+# Fifth parameter (optional): the directory where output should be saved. [DFM_multisample_outdir]
 
 unless (length($dir) && -e $dir) {
 	print "Usage: computeDMF-multisample.pl inputDirectory [fingerprintLengths] [outputDirectory]\n";
@@ -24,8 +32,10 @@ my $computeBinary = 0;
 my $computeClose = 0;
 my $numberOfPartitions = 100;
 $out ||= "DMF_multisample_outdir";
+$dist ||= 'mean';
+$k ||= 2;
 mkdir $out, 0700;
-my @keys = qw/ACAC ACAG ACAT ACCA ACCG ACCT ACGA ACGC ACGT ACTA ACTC ACTG AGAC AGAG AGAT AGCA AGCG AGCT AGGA AGGC AGGT AGTA AGTC AGTG ATAC ATAG ATAT ATCA ATCG ATCT ATGA ATGC ATGT ATTA ATTC ATTG CAAC CAAG CAAT CACA CACG CACT CAGA CAGC CAGT CATA CATC CATG CGAC CGAG CGAT CGCA CGCG CGCT CGGA CGGC CGGT CGTA CGTC CGTG CTAC CTAG CTAT CTCA CTCG CTCT CTGA CTGC CTGT CTTA CTTC CTTG GAAC GAAG GAAT GACA GACG GACT GAGA GAGC GAGT GATA GATC GATG GCAC GCAG GCAT GCCA GCCG GCCT GCGA GCGC GCGT GCTA GCTC GCTG GTAC GTAG GTAT GTCA GTCG GTCT GTGA GTGC GTGT GTTA GTTC GTTG TAAC TAAG TAAT TACA TACG TACT TAGA TAGC TAGT TATA TATC TATG TCAC TCAG TCAT TCCA TCCG TCCT TCGA TCGC TCGT TCTA TCTC TCTG TGAC TGAG TGAT TGCA TGCG TGCT TGGA TGGC TGGT TGTA TGTC TGTG/;
+my @keys = makekeys($k);
 
 FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 	my $cat;
@@ -54,13 +64,14 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 		}
 	}
 	
-	my($currentChromosome, $outdir, $lines, @prevPos, @prevKey, @close, @count, @binary, @snvPairs);
+	my($currentChromosome, $outdir, $lines, @prevStarts, @prevKeys, @close, @count, @binary, @snvPairs);
 	while (<F>) {
 		chomp;
-		my($chrom, $pos, $rsid, $ref, $alt, $qual, $filter, $infostring, $format, @obs) = split /\t/;
+
+		my($chrom, $start, $rsid, $ref, $alt, $qual, $filter, $infostring, $format, @obs) = split /\t/;
 		$chrom = "chr$chrom" unless $chrom =~ /^chr/;
 		if (-e "$out/$chrom") {
-			if ($chrom ne $currentChromosome) {
+			if ($chrom ne $currentChromosome && defined($currentChromosome)) {
 				close F;
 				next FILE;
 			}
@@ -78,12 +89,29 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 		my $key = uc "$ref$alt";
 		
 		foreach my $i (0..$#obs) {
+
 			my $gt = $obs[$i];
 			next if $gt =~ /0.0/ || $gt =~ /\./;
-			if ($prevKey[$i]) {
-				my $d = $pos-$prevPos[$i]-1;
-				next if $d<0;
-				my $pairKey = $prevKey[$i].$key;
+
+			my @D;
+			my $d;
+			if (enoughKeys($k, $i, @prevKeys)) {
+				@D = getDs($prevStarts[$i], $start);
+
+				next if any {$_ < 0} @D;
+
+				if ($dist eq "mean") {
+					$d = int(sum(@D)/@D);
+				} elsif($dist eq "max") {
+					$d = max(@D);
+				} elsif($dist eq "min") {
+					$d = min(@D);
+				} else {
+					print("Bad distance function");
+					die;
+				}	
+
+				my $pairKey = join "", @{$prevKeys[$i]}, $key;
 				if ($d<$tooCloseCutoff) {
 					$close[$i]{$pairKey}[$d]++ if $computeClose;
 				} else {
@@ -93,8 +121,9 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 					}
 				}
 			}
-			$prevPos[$i] = $pos;
-			$prevKey[$i] = $key;
+			# @prevChroms = updateList($k, @prevChroms, $chrom);
+			$prevStarts[$i] = updateList($k, $start, $prevStarts[$i]);
+			$prevKeys[$i] = updateList($k, $key, $prevKeys[$i]);
 			$snvPairs[$i]++;
 		}
 		
@@ -171,3 +200,72 @@ sub partition {
 	return $v;
 }
 
+sub makekeys {
+	my @vars = ('AC', 'AT', 'AG',
+				'CA', 'CT', 'CG',
+				'TA', 'TC', 'TG',
+				'GA', 'GC', 'GT');
+	my $k = $_[0];
+	my @oldkeys = @vars;
+	my @keys;
+
+	for (my $i = 1; $i < $k; $i++) {
+		@keys = ();
+		for my $a (@vars) {
+			for my $b (@oldkeys) {
+				push @keys, $a.$b;
+			}
+		}
+		@oldkeys = @keys;
+	}
+	return @keys;
+}
+
+sub getDs {
+	my $prevStartRef = shift;
+	my $start = shift;
+	my @prevStarts = @{$prevStartRef};
+	my @D;
+	my $currStart = $start;
+
+	for my $s (reverse(@prevStarts)) {
+		push @D, $currStart - $s - 1;
+		$currStart = $s;
+	}
+
+	return @D;
+}
+
+sub updateList {
+	my @poop = @_;
+	my $k = shift;
+	my $new = shift;
+	my $ref = shift;
+
+	if (not defined($ref)) {
+		my $out = [$new];
+		return $out;
+	}
+
+	my @old = @{$ref};
+	my $l = @old;
+
+	if ($l >= $k-1) {
+		shift @old;
+	}
+
+	push @old, $new;
+	return \@old;
+}
+
+sub enoughKeys {
+	my $k = shift;
+	my $i = shift;
+	my $ref = @_[$i];
+	if (not defined($ref)) {
+		return 0;
+	}
+	my @prev = @{$ref};
+	my $l = @prev;
+	return $l + 1 >= $k;
+}
