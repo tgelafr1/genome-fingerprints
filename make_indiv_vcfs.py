@@ -16,11 +16,11 @@ from tqdm import tqdm
 # compute = sys.argv[3]
 
 # parameters
-compute = '/home/victor/github/genome-fingerprints/bin/computeDMF.pl'
-results_path = Path('/home/victor/Documents/results_chr21')
-header = pd.read_csv('/home/victor/Documents/sample_names_6_pop.csv')
+compute = '/home/ec2-user/github/genome-fingerprints/bin/computeDMF.pl'
+results_path = Path('/home/ec2-user/Documents/results_chr21')
+header = pd.read_csv('/home/ec2-user/github/genome-fingerprints/data/sample_names_6_pop.csv')
 
-vcf = '/home/victor/Documents/1000genomes/21_22/ALL.chr21.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz'
+vcf = '/home/ec2-user/github/genome-fingerprints/data/ALL.chr21.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz'
 k = str(5)
 dist = 'mean'
 format = 'vcf'
