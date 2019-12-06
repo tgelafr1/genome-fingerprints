@@ -20,7 +20,7 @@ unless (length($dir) && -e $dir) {
 	print "Usage: computeDMF-multisample.pl inputDirectory [consecutiveSNPs] [distanceMetric] [fingerprintLengths] [outputDirectory]\n";
 	print "       consecutiveSNPs defaults to 2; distanceMetric defaults to 'mean'; fingerprintLengths defaults to 120; outputDirectory defaults to DMF_multisample_outdir\n";
 	print "Examples: computeDMF-multisample.pl dirWithVCFs\n";
-	print "			 computeDMF-multisample.pl dirWithVCFs 3 min"
+	print "			 computeDMF-multisample.pl dirWithVCFs 3 min\n";
 	print "          computeDMF-multisample.pl dirWithVCFs 2 mean 20,100\n";
 	print "          computeDMF-multisample.pl dirWithBCFs 2 mean 0 desiredOutputDir\n";
 	exit;
@@ -115,7 +115,7 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 				@D = getDs($prevStarts[$i], $start);
 
 				# If any of the distances are negative, stop, somethings wrong.
-				next if any {$_ < 0} @D;
+				next if any{$_ < 0} @D;
 
 				# Calculate the final distance metric based on user input.
 				if ($dist eq "mean") {
