@@ -17,11 +17,12 @@ my($dir, $k, $dist, $vls, $out) = @ARGV;
 # Fifth parameter (optional): the directory where output should be saved. [DFM_multisample_outdir]
 
 unless (length($dir) && -e $dir) {
-	print "Usage: computeDMF-multisample.pl inputDirectory [fingerprintLengths] [outputDirectory]\n";
-	print "       fingerprintLengths defaults to 120; outputDirectory defaults to DMF_multisample_outdir\n";
+	print "Usage: computeDMF-multisample.pl inputDirectory [consecutiveSNPs] [distanceMetric] [fingerprintLengths] [outputDirectory]\n";
+	print "       consecutiveSNPs defaults to 2; distanceMetric defaults to 'mean'; fingerprintLengths defaults to 120; outputDirectory defaults to DMF_multisample_outdir\n";
 	print "Examples: computeDMF-multisample.pl dirWithVCFs\n";
-	print "          computeDMF-multisample.pl dirWithVCFs 20,100\n";
-	print "          computeDMF-multisample.pl dirWithBCFs 0 desiredOutputDir\n";
+	print "			 computeDMF-multisample.pl dirWithVCFs 3 min"
+	print "          computeDMF-multisample.pl dirWithVCFs 2 mean 20,100\n";
+	print "          computeDMF-multisample.pl dirWithBCFs 2 mean 0 desiredOutputDir\n";
 	exit;
 }
 
@@ -31,13 +32,19 @@ my $tooCloseCutoff = 20;
 my $computeBinary = 0;
 my $computeClose = 0;
 my $numberOfPartitions = 100;
+
+# Set defaults
 $out ||= "DMF_multisample_outdir";
 $dist ||= 'mean';
 $k ||= 2;
 mkdir $out, 0700;
+
+# Make possible base pair keys, dependent on how many consecutive SNPs are being
+# used.
 my @keys = makekeys($k);
 
 FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
+	# Not modified by us, this code just reads in the files.
 	my $cat;
 	if ($file =~ /\.gz$/) {
 		$cat = 'gunzip -c';
@@ -65,9 +72,13 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 	}
 	
 	my($currentChromosome, $outdir, $lines, @prevStarts, @prevKeys, @close, @count, @binary, @snvPairs);
+
+	# While the file is open...
 	while (<F>) {
 		chomp;
 
+		# Read in line information, make sure it is well formed, create 
+		# appropriate output directory.
 		my($chrom, $start, $rsid, $ref, $alt, $qual, $filter, $infostring, $format, @obs) = split /\t/;
 		$chrom = "chr$chrom" unless $chrom =~ /^chr/;
 		if (-e "$out/$chrom") {
@@ -88,6 +99,8 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 		next unless $alt =~ /^[ACGT]$/io && $ref =~ /^[ACGT]$/io;
 		my $key = uc "$ref$alt";
 		
+		# For each sample in the file...
+		# This is where the bulk of our implementation appears!
 		foreach my $i (0..$#obs) {
 
 			my $gt = $obs[$i];
@@ -95,11 +108,16 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 
 			my @D;
 			my $d;
+			# Only compute the metric if you've already read in k keys.
 			if (enoughKeys($k, $i, @prevKeys)) {
+
+				# Get the distances between each pair of SNPs
 				@D = getDs($prevStarts[$i], $start);
 
+				# If any of the distances are negative, stop, somethings wrong.
 				next if any {$_ < 0} @D;
 
+				# Calculate the final distance metric based on user input.
 				if ($dist eq "mean") {
 					$d = int(sum(@D)/@D);
 				} elsif($dist eq "max") {
@@ -111,9 +129,15 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 					die;
 				}	
 
+				# Create the key for the set of SNPs by concatenating all of the
+				# individual keys
 				my $pairKey = join "", @{$prevKeys[$i]}, $key;
+
+				# If the distance is too close, add to "close" matrix
 				if ($d<$tooCloseCutoff) {
 					$close[$i]{$pairKey}[$d]++ if $computeClose;
+				
+				# Else add to fingerprint
 				} else {
 					$binary[$i]{$pairKey}[$d % 2]++ if $computeBinary;
 					foreach my $vl (@vls) {
@@ -121,12 +145,16 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 					}
 				}
 			}
-			# @prevChroms = updateList($k, @prevChroms, $chrom);
+
+			# Update lists containing information about previous SNPs within 
+			# a range of k.
 			$prevStarts[$i] = updateList($k, $start, $prevStarts[$i]);
 			$prevKeys[$i] = updateList($k, $key, $prevKeys[$i]);
+
 			$snvPairs[$i]++;
 		}
 		
+		# Debugging output
 		$lines++;
 		#last if $lines>10000;
 		print "." unless $lines % 10000;
@@ -134,6 +162,8 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 	}
 	close F;
 	
+	# This code was not modified by us! It writes the saved fingerprint to the
+	# output file.
 	foreach my $i (0..$#samples) {
 		my $sample = $samples[$i];
 		my $partition = partition($sample);
@@ -179,6 +209,7 @@ FILE: foreach my $file (slicedirlist($dir, "[bv]cf")) {
 	print "\n";
 }
 
+# Not written by us.
 sub slicedirlist {
 	my($dir, $pat) = @_;
 	opendir (DIR, $dir);
@@ -187,6 +218,7 @@ sub slicedirlist {
 	return @files;
 }
 
+# Not written by us.
 sub partition {
 	my($name) = @_;
 	
@@ -200,6 +232,12 @@ sub partition {
 	return $v;
 }
 
+# A function that makes the key values based on how many consecutive pairs of
+# SNPs are being used.
+#
+# Args: k	The number of consecutive SNPs to use.
+#
+# Returns: A list of character values corresponding to the keys.
 sub makekeys {
 	my @vars = ('AC', 'AT', 'AG',
 				'CA', 'CT', 'CG',
@@ -221,6 +259,14 @@ sub makekeys {
 	return @keys;
 }
 
+# A function to get pairwise distances between consecutive elements of a list.
+# 
+# Args: prevStartRef	A reference to a list of all the start values of the
+#						k-1 previous SNPs
+# 		start			The start value of the current SNP.
+# 
+# Returns: A list of k-1 values corresponding to the distances between
+#		   consecutive elements of the input items.
 sub getDs {
 	my $prevStartRef = shift;
 	my $start = shift;
@@ -236,8 +282,17 @@ sub getDs {
 	return @D;
 }
 
+# A function to pop the first element off a list and push a new element onto the
+# end of a list. These lists keep track of the k SNP elements we are 
+# computing across. The function won't remove elements if the list is less than
+# k elements long.
+#
+# Args: k		The number of elements to keep in the list.
+#		new 	The new element to add to the list.
+#		ref		A reference to the old list.
+#
+# Returns: A reference to the new list.
 sub updateList {
-	my @poop = @_;
 	my $k = shift;
 	my $new = shift;
 	my $ref = shift;
@@ -258,6 +313,17 @@ sub updateList {
 	return \@old;
 }
 
+# A function to check if enough keys have been collected to begin calculating
+# distance metrics.
+#
+# Args: k	The number of consecutive SNPs being evaluated.
+#		i	The index of the sample currently being evaluated.
+#		_	A list of references to previous keys collected. Essentially an
+#		array of arrays which stores all of previous keys extracted for each
+#		sample.
+#
+# Returns: a boolean indicating whether or not the key list is long enough to
+#          proceed.
 sub enoughKeys {
 	my $k = shift;
 	my $i = shift;

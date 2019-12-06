@@ -225,6 +225,12 @@ sub avgstd {
 	return $avg, $std;
 }
 
+# A function that makes the key values based on how many consecutive pairs of
+# SNPs are being used.
+#
+# Args: k	The number of consecutive SNPs to use.
+#
+# Returns: A list of character values corresponding to the keys.
 sub makekeys {
 	my @vars = ('AC', 'AT', 'AG',
 				'CA', 'CT', 'CG',
@@ -246,6 +252,13 @@ sub makekeys {
 	return @keys;
 }
 
+# A function to get pairwise distances between consecutive elements of a list.
+# 
+# Args: prevStarts		A list of all the start values of the k-1 previous SNPs.
+# 		start			The start value of the current SNP.
+# 
+# Returns: A list of k-1 values corresponding to the distances between
+#		   consecutive elements of the input items.
 sub getDs {
 	my $start = shift;
 	my @prevStarts = @_;
@@ -260,6 +273,12 @@ sub getDs {
 	return @D;
 }
 
+# Check if all SNPs to be analyzed are on the same chromosome.
+#
+# Args: k	The number consecutive SNPs.
+#		_	The array of SNP chromosome values.
+#
+# Return: A boolean indicating whether or not all the chromosomes are the same.
 sub sameChroms {
 	my $k = shift;
 	my $array_length = @_;
@@ -273,6 +292,13 @@ sub sameChroms {
 	$array_length != 1 && $uniq_length == 1 ? return 1 : return 0;	
 }
 
+# A function to pop the first element off a list if it's too long (has more than
+# k elements)
+#
+# Args: k		The number of elements to keep in the list.
+#		_		The old list.
+#
+# Returns: The new list.
 sub updateList{
 	my $k = shift;
 	my $l = @_;
@@ -280,6 +306,5 @@ sub updateList{
 	if ($l >= $k) {
 		shift;
 	}
-	my @poop = @_;
 	return @_;
 }
