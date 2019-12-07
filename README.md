@@ -1,27 +1,30 @@
 # genome-fingerprints
-Software for creating and comparing genome fingerprints.  
-More information and datasets: http://db.systemsbiology.net/gestalt/genome_fingerprints/  
-Preprint: http://www.biorxiv.org/content/early/2017/06/27/130807
+Software for creating and comparing genome fingerprints.
+Forked from https://github.com/gglusman/genome-fingerprints
+Tested on Ubuntu 18.04.3 LTS (Bionic Beaver)
 
-1. To create a fingerprint for a genome:  
-	`bin/computeDMF.pl` _myGenome path-to-my-vcfs/myGenome.vcf.gz_  
-	...will generate myGenome.outn.gz (and some other files)
+## dependencies
+`perl (v.5.26.2)`
 
-2. To compare two fingerprints:  
-	`bin/compareDMFs.pl` _myFirstGenome.outn.gz mySecondGenome.outn.gz_
+`python 3`
+`numpy`, `pandas`, `joblib`, `tqdm`, `matplotlib`, `seaborn`, `scikit-learn`
 
-3. To serialize fingerprints into a database, using L=120:  
-	`bin/serializeDMFs.pl` _myFingerprintCollection_ 120 _@myListOfFingerprints_  
-	`bin/serializeDMFs.pl` _myFingerprintCollection_ 120 _*.outn.gz_
+## 1000 Genomes data
+VCF files were obtained from ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/
 
-4. To compare a fingerprint to a database:  
-	`bin/searchDMFs.pl` _myGenome.outn.gz myFingerprintCollection_  
-	...see the data directory for an example database (CEPH1463 pedigree)
+Example multisample VCF file: `ALL.chr21.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz`
 
-5. To compare two databases:  
-	`bin/searchDMFs.pl` _aFingerprintCollection anotherFingerprintCollection_
+## Choosing samples and populations
+Header file with complete list of all 2504 individuals and their corresponding population are in `data/actual_sample_names.csv`
+You can compute fingerprints on a subset of the data by using `extract_population.ipynb`
 
-6. To perform all-against-all comparisons in one database:  
-	`bin/searchDMFs.pl` _aFingerprintCollection_
+## Computing fingerprints
+perl script that computes fingerprints from `*.vcf.gz` is bin/computeDMF.pl
 
-This project is related to (but distinct from) the Genotype Fingerprints: https://github.com/gglusman/genotype-fingerprints
+python script that computes multiple fingerprints from a multisample VCF: `make_indiv_vcfs.py`
+
+Example usage:
+`python make_indiv_vcfs.py bin/computeDMF.pl 3 mean data/results_chr21/ data/sample_names_6_pop.csv data/ALL.chr21.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz 5,7,11,13,17,19,20,40,50,80,100,120,200`
+
+## Evaluation of algorithm
+use `Analysis.ipynb` to compare fingerprints to populations, do PCA, and classify samples to populations
