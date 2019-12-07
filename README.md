@@ -11,7 +11,7 @@ Tested on Ubuntu 18.04.3 LTS (Bionic Beaver)
 `numpy`, `pandas`, `joblib`, `tqdm`, `matplotlib`, `seaborn`, `scikit-learn`
 
 ## 1000 Genomes data
-VCF files were obtained from ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/
+VCF files were obtained from [ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/](ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/])
 
 Example multisample VCF file: `ALL.chr21.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz`
 
